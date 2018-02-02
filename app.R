@@ -37,10 +37,33 @@ ui <- fluidPage(
    # Sidebar with a slider input for number of bins
    sidebarLayout(
       sidebarPanel(
-
-        numericInput("readlength", label = h4("Read length (bp)"), value = 75),
-        numericInput("ontarget", label = h4("Expected on-target (%)"), value = 70),
-        numericInput("dup", label = h4("Expected duplication (%)"), value = 15),
+        fluidRow(column(
+          6,
+          numericInput(
+            "readlength",
+            label = h4("Read length (bp)"),
+            value = 75
+          ),
+          numericInput(
+            "ontarget",
+            label = h4("Expected on-target (%)"),
+            value = 70
+          )
+        ),
+        column(
+          6,
+          numericInput(
+            "dup",
+            label = h4("Expected duplication (%)"),
+            value = 15
+          ),
+          numericInput(
+            "insert",
+            label = h4("Average insert size (bp)"),
+            value = 160
+          )
+        )), 
+       
         radioButtons("sepe", label = NA,
                      choices = list("Paired-end" = 2, "Single-end" = 1),
                      selected = 2),
@@ -152,8 +175,12 @@ server <- function(input, output) {
     if (input$genomesizebutton=="") req(input$genomesizeOther)
     if (input$whatcalc=="reads") {
       # N=CG/L
-      reads <- (as.numeric(input$dynamic)*as.numeric(genomesize()))/(as.numeric(input$readlength)*as.numeric(input$sepe))/as.numeric(input$ontarget*0.01)/as.numeric(1-(input$dup*0.01))
-      gb <- (as.numeric(input$readlength)*as.numeric(input$sepe))*reads/1e+9
+      cycle <- as.numeric(input$readlength)*as.numeric(input$sepe)
+      insert <- ifelse( cycle > input$insert, 
+                       input$insert/cycle ,
+                       1)
+      reads <- (as.numeric(input$dynamic)*as.numeric(genomesize()))/cycle/as.numeric(input$ontarget*0.01)/as.numeric(1-(input$dup*0.01))/insert
+      gb <- cycle*reads/1e+9
       str1 <- paste0(input$dynamic, "X coverage of ", bptosi(genomesize()), " target region")
       str2 <- paste0("Reads: ",signif(reads/1e6, 3)," million reads")
       str3 <- paste0("Read Length: ",input$readlength , " x ", input$sepe)
@@ -163,12 +190,16 @@ server <- function(input, output) {
       #paste0("*", signif(reads/1e6, 3), " million reads* required for ", input$dynamic, "X coverage of a ", bptosi(genomesize()), " genome using ", input$sepe, "x", input$readlength, " sequencing reads.")
     } else if (input$whatcalc=="coverage") {
       # C=LN/G
-      coverage <- (as.numeric(input$readlength)*as.numeric(input$sepe))*as.numeric(input$dynamic)*1e6/as.numeric(genomesize())*as.numeric(input$ontarget*0.01)*as.numeric(1-(input$dup*0.01))
-      gb2 <-  ((as.numeric(input$readlength)*as.numeric(input$sepe))*as.numeric(input$dynamic)*1e6)/1e9
+      cycle <- as.numeric(input$readlength)*as.numeric(input$sepe)
+      insert <- ifelse( cycle > input$insert, 
+                        input$insert/cycle ,
+                        1)
+      coverage <- (as.numeric(input$readlength)*as.numeric(input$sepe))*as.numeric(input$dynamic)*1e6/as.numeric(genomesize())*as.numeric(input$ontarget*0.01)*as.numeric(1-(input$dup*0.01))*insert
+      gb <-  ((as.numeric(input$readlength)*as.numeric(input$sepe))*as.numeric(input$dynamic)*1e6)/1e9
       str1 <- paste0(round(coverage), "X coverage of ", bptosi(genomesize()), " target region")
       str2 <- paste0("Reads: ",input$dynamic," million reads")
       str3 <- paste0("Read Length: ",input$readlength , " x ", input$sepe)
-      str4 <- paste0("Bases output: ",round(gb2, digits = 1),"Gb")
+      str4 <- paste0("Bases output: ",round(gb, digits = 1),"Gb")
       HTML(paste(str1, str2, str3, str4, sep = '<br/>'))
       #paste0("*", round(coverage), "X coverage* for a ", bptosi(genomesize()), " genome obtained with ", input$dynamic, "M ", input$sepe, "x", input$readlength, " sequencing reads.")
     }
